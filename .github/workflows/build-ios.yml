@@ -1,0 +1,67 @@
+name: Build EmuPC IPA
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - "app/**"
+      - "build/**"
+      - "tools/**"
+      - "wine/**"
+      - "FEX/**"
+      - "dxmt/**"
+      - "madeira-dock/**"
+      - "madeira-d3d12/**"
+      - ".github/workflows/build-ios.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: build-ios-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build unsigned iOS IPA
+    runs-on: macos-latest
+    timeout-minutes: 360
+
+    steps:
+      - name: Check out repository and submodules
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          fetch-depth: 0
+
+      - name: Show build environment
+        run: |
+          sw_vers
+          xcodebuild -version
+          xcrun --sdk iphoneos --show-sdk-version
+          brew --version
+          python3 --version
+
+      - name: Build EmuPC
+        env:
+          JOBS: "2"
+          CONFIGURATION: Debug
+        run: |
+          chmod +x tools/build-ipa.sh
+          ./tools/build-ipa.sh
+
+      - name: Verify IPA exists
+        run: |
+          test -s dist/Madeira.ipa
+          unzip -tq dist/Madeira.ipa
+          ls -lh dist/Madeira.ipa
+
+      - name: Upload IPA artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: EmuPC-iOS-IPA
+          path: dist/Madeira.ipa
+          if-no-files-found: error
+          retention-days: 7
